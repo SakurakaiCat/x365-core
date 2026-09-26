@@ -1,7 +1,7 @@
 # X365 协议核心（core）
 
 X365 协议的 Go 参考实现，位于本仓库 `core/` 目录，module 路径为
-`github.com/365vpn/x365/core`。桌面端、移动端与 CLI 均基于本包构建。
+`github.com/SakurakaiCat/x365-core`。桌面端、移动端与 CLI 均基于本包构建。
 
 ## 协议概览
 

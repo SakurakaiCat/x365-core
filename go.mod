@@ -1,4 +1,4 @@
-module github.com/365vpn/x365
+module github.com/SakurakaiCat/x365-core
 
 go 1.26
 
