@@ -12,8 +12,8 @@ import (
 
 // X365Config holds the parsed configuration from an x365:// URI.
 type X365Config struct {
-	UUID       [16]byte
-	Server     string
+	UUID        [16]byte
+	Server      string
 	Port        uint16
 	Path        string
 	Host        string
@@ -21,7 +21,25 @@ type X365Config struct {
 	PublicKey   string
 	ShortID     string
 	Fingerprint string
+	// Transport selects the wire protocol: "xhttp" (XHTTP over HTTP/2, the
+	// default) or "h1" (the legacy HTTP/1.1 chunked transport). The h1
+	// transport expects the server-side auth token below; xhttp does not
+	// require it (but it is sent when set, matching normal client traffic).
+	Transport string
+	// Token is the account JWT ("access token"). Recommended for both
+	// transports; the server is strictest about it on the h1 route.
+	Token string
 }
+
+// Wire-format constants.
+const (
+	// BrowserUserAgent is the user-agent sent with tunnel requests (Chrome
+	// 120 on Windows 64-bit), matching the traffic profile the server expects.
+	BrowserUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+	// xPaddingLen is the length of the "?x_padding=" filler appended to the
+	// request path (observed: 65 'X' bytes).
+	xPaddingLen = 65
+)
 
 // Label extracts the human-readable name from the URI fragment (e.g. "#香港").
 func Label(uri string) string {
@@ -142,6 +160,21 @@ func ParseURI(uri string) (*X365Config, error) {
 		if cfg.Fingerprint == "" {
 			cfg.Fingerprint = "chrome"
 		}
+		cfg.Token = vals.Get("token")
+		t := vals.Get("type")
+		if t == "" {
+			t = vals.Get("network")
+		}
+		switch t {
+		case "":
+			cfg.Transport = "xhttp" // default transport
+		case "xhttp", "splithttp":
+			cfg.Transport = "xhttp"
+		case "h1", "http":
+			cfg.Transport = "h1"
+		default:
+			return nil, fmt.Errorf("unsupported transport %q", t)
+		}
 	}
 
 	return cfg, nil
@@ -151,7 +184,7 @@ func ParseURI(uri string) (*X365Config, error) {
 func buildX365Header(uuid [16]byte, port uint16, targetHost string) []byte {
 	buf := make([]byte, 0, 64)
 	buf = append(buf, 'X', '3', '6', '5', 0x01) // magic + const
-	buf = append(buf, 0x01)                      // TCP
+	buf = append(buf, 0x01)                     // TCP
 	buf = append(buf, uuid[:]...)
 	pb := make([]byte, 2)
 	binary.BigEndian.PutUint16(pb, port)

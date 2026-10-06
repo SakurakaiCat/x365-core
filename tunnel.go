@@ -10,9 +10,24 @@ import (
 	"time"
 )
 
-// Dial establishes a tunnel to targetHost:targetPort through the X365 server.
-// Returns a net.Conn that reads/writes through the chunked HTTP/1.1 tunnel.
+// Dial establishes a tunnel to targetHost:targetPort through the X365
+// server, using the transport selected by cfg.Transport ("xhttp", the
+// default, or "h1" for the legacy HTTP/1.1 chunked transport). Returns a
+// full-duplex net.Conn.
 func Dial(ctx context.Context, cfg *X365Config, targetHost string, targetPort uint16) (net.Conn, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if cfg.Transport == "" || cfg.Transport == "xhttp" {
+		return DialXHTTP(ctx, cfg, targetHost, targetPort)
+	}
+	return dialH1(ctx, cfg, targetHost, targetPort)
+}
+
+// dialH1 is the legacy HTTP/1.1 chunked transport. The server enforces its
+// auth token more strictly on this route (requests observed without a browser
+// user-agent were rejected with 403), so a token is recommended here.
+func dialH1(ctx context.Context, cfg *X365Config, targetHost string, targetPort uint16) (net.Conn, error) {
 	serverAddr := net.JoinHostPort(cfg.Server, fmt.Sprintf("%d", cfg.Port))
 
 	dialer := &net.Dialer{Timeout: 10 * time.Second}
@@ -29,8 +44,12 @@ func Dial(ctx context.Context, cfg *X365Config, targetHost string, targetPort ui
 
 	header := buildX365Header(cfg.UUID, targetPort, targetHost)
 
-	httpReq := fmt.Sprintf("POST %s HTTP/1.1\r\nHost: %s\r\nContent-Type: application/grpc\r\nTransfer-Encoding: chunked\r\nTE: trailers\r\n\r\n",
-		cfg.Path, cfg.SNI)
+	httpReq := fmt.Sprintf("POST %s HTTP/1.1\r\nHost: %s\r\nContent-Type: application/grpc\r\nTransfer-Encoding: chunked\r\nTE: trailers\r\nUser-Agent: %s\r\n",
+		cfg.Path, cfg.SNI, BrowserUserAgent)
+	if cfg.Token != "" {
+		httpReq += "Authorization: Bearer " + cfg.Token + "\r\n"
+	}
+	httpReq += "\r\n"
 	if _, err := tlsConn.Write([]byte(httpReq)); err != nil {
 		tlsConn.Close()
 		return nil, fmt.Errorf("write http request: %w", err)
@@ -78,6 +97,10 @@ func Dial(ctx context.Context, cfg *X365Config, targetHost string, targetPort ui
 		return nil, fmt.Errorf("read ack chunk: %w", err)
 	}
 	if len(firstChunk) >= 4 && string(firstChunk[:4]) == "X365" {
+		if len(firstChunk) >= 5 && firstChunk[4] != 0x00 {
+			tlsConn.Close()
+			return nil, fmt.Errorf("x365: server status 0x%02x", firstChunk[4])
+		}
 		// Tunnel established
 	} else {
 		tlsConn.Close()
@@ -170,8 +193,8 @@ func (c *chunkedConn) Close() error {
 	return c.tls.Close()
 }
 
-func (c *chunkedConn) LocalAddr() net.Addr        { return c.tls.LocalAddr() }
-func (c *chunkedConn) RemoteAddr() net.Addr       { return c.tls.RemoteAddr() }
-func (c *chunkedConn) SetDeadline(t time.Time) error       { return c.tls.SetDeadline(t) }
-func (c *chunkedConn) SetReadDeadline(t time.Time) error    { return c.tls.SetReadDeadline(t) }
-func (c *chunkedConn) SetWriteDeadline(t time.Time) error   { return c.tls.SetWriteDeadline(t) }
+func (c *chunkedConn) LocalAddr() net.Addr                { return c.tls.LocalAddr() }
+func (c *chunkedConn) RemoteAddr() net.Addr               { return c.tls.RemoteAddr() }
+func (c *chunkedConn) SetDeadline(t time.Time) error      { return c.tls.SetDeadline(t) }
+func (c *chunkedConn) SetReadDeadline(t time.Time) error  { return c.tls.SetReadDeadline(t) }
+func (c *chunkedConn) SetWriteDeadline(t time.Time) error { return c.tls.SetWriteDeadline(t) }

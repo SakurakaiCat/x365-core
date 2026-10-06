@@ -10,8 +10,8 @@ import (
 type LogFunc func(format string, args ...interface{})
 
 var (
-	logMu  sync.RWMutex
-	logFn  LogFunc
+	logMu sync.RWMutex
+	logFn LogFunc
 )
 
 // SetLogger installs a custom log callback. Pass nil to revert to the default

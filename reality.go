@@ -21,7 +21,7 @@ import (
 	"golang.org/x/crypto/hkdf"
 )
 
-// realityDial performs the Reality TLS handshake (xray-core 26.3.27 compatible).
+// realityDial performs the REALITY TLS handshake.
 func realityDial(ctx context.Context, rawConn net.Conn, serverName, pbkStr, sidStr, fingerprint string) (net.Conn, error) {
 	publicKey, err := decodeBase64URL(pbkStr)
 	if err != nil {
@@ -73,15 +73,15 @@ func realityDial(ctx context.Context, rawConn net.Conn, serverName, pbkStr, sidS
 		NextProtos:             []string{"h2", "http/1.1"},
 	}
 
-	uConn := utls.UClient(rawConn, uConfig, utls.HelloChrome_Auto)
+	uConn := utls.UClient(rawConn, uConfig, helloID(fingerprint))
 	uConn.BuildHandshakeState()
 
 	hello := uConn.HandshakeState.Hello
 	hello.SessionId = make([]byte, 32)
 	copy(hello.Raw[39:], hello.SessionId)
-	hello.SessionId[0] = 26 // xray-core Version_x
-	hello.SessionId[1] = 3  // Version_y
-	hello.SessionId[2] = 27 // Version_z
+	hello.SessionId[0] = 26 // protocol version x
+	hello.SessionId[1] = 3  // protocol version y
+	hello.SessionId[2] = 27 // protocol version z
 	hello.SessionId[3] = 0
 	binary.BigEndian.PutUint32(hello.SessionId[4:], uint32(time.Now().Unix()))
 	copy(hello.SessionId[8:], shortID[:])
@@ -114,4 +114,15 @@ func realityDial(ctx context.Context, rawConn net.Conn, serverName, pbkStr, sidS
 		return nil, errors.New("REALITY handshake FAILED (server returned fallback cert)")
 	}
 	return uConn, nil
+}
+
+// helloID maps the URI fp= parameter to a uTLS ClientHello spec.
+// "chrome" selects HelloChrome_120, the profile the server expects.
+func helloID(fp string) utls.ClientHelloID {
+	switch fp {
+	case "chrome", "chrome120":
+		return utls.HelloChrome_120
+	default:
+		return utls.HelloChrome_Auto
+	}
 }
