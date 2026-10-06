@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="assets/open-x365.svg" alt="Open X365" width="460">
+</div>
+
 # X365 协议核心（core）
 
 X365 协议的 Go 参考实现，位于本仓库 `core/` 目录，module 路径为
