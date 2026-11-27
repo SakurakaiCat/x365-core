@@ -1,3 +1,12 @@
+> [!WARNING]
+> **本仓库已停止更新（已归档）。** 本项目仅作为历史记录保留，不再接受功能更新、缺陷修复或安全维护。
+>
+> **免责声明：** 本项目按“现状”提供，不作任何明示或暗示的担保；作者不对使用、复制、修改或分发本项目及其衍生内容所导致的任何直接或间接损失承担责任。使用者应自行评估风险，并遵守所在地法律法规。
+>
+> **This repository is no longer maintained and has been archived.** It is retained for historical reference only; no further features, bug fixes, or maintenance will be provided.
+>
+> **Disclaimer:** This project is provided “as is,” without warranty of any kind. The author is not liable for any direct or indirect damages arising from the use, copying, modification, or distribution of this project or its derivative contents. Users are responsible for assessing the risks and complying with applicable laws.
+
 <div align="center">
   <img src="assets/open-x365.svg" alt="Open X365" width="460">
 </div>
